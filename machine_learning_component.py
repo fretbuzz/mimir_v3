@@ -11,9 +11,11 @@ class mimir_ml_model:
       _, _, self.optimal_train_thresh, self.optimal_train_f1, self.y_optimal_thresholded = \
           find_optimal_train_threshold(self.train_predictions, Y)
       # TODO need to get: self.exfil_paths_train, self.exfil_weights_train)
-      self.confusion_matrix = generate_cm(self.y_optimal_thresholded, self.exfil_paths_train, self.exfil_weights_train)
+      self.train_confusion_matrix = generate_cm(self.y_optimal_thresholded, self.exfil_paths_train, self.exfil_weights_train)
+      self.train_performnace = sklearn.metrics.classification_report(Y, self.y_optimal_thresholded, output_dict=True)
 
-def run_ml_models(time_gran_to_feature_and_label_df, time_gran_to_ml_model_name_to_Relevanqt_Model_Info):
+
+def run_ml_models(time_gran_to_feature_df, time_gran_to_ml_model_name_to_Relevanqt_Model_Info):
     time_gran_to_ml_model_name_to_performance = {}
     for time_gran, ml_model_name_to_Relevanqt_Model_Info in time_gran_to_ml_model_name_to_Relevanqt_Model_Info.iteritems():
         ml_model_name_to_performance = {}
@@ -22,10 +24,37 @@ def run_ml_models(time_gran_to_feature_and_label_df, time_gran_to_ml_model_name_
             # TODO TODO TODO :: finish calculating the performance here!
             test_predictions = Relevant_Model_Info.clf.predict(X=Xt)
 
-def train_ml_models(time_gran_to_feature_and_label_df):
+    # TODO: return alerts.
+    return None
+
+def find_model_perform(predicted_values, actual_values, exfil_paths_test, exfil_weights_test):
+    attack_type_to_predictions, attack_type_to_truth, attack_type_to_weights = \
+        process_roc.determine_categorical_labels(actual_values, predicted_values, exfil_paths_test,
+                                                 exfil_weights_test.tolist())
+
+    attack_type_to_confusion_matrix_values = process_roc.determine_cm_vals_for_categories(
+        attack_type_to_predictions, attack_type_to_truth)
+
+    # print "attack_type_to_confusion_matrix_values", attack_type_to_confusion_matrix_values
+
+    categorical_cm_df = process_roc.determine_categorical_cm_df(attack_type_to_confusion_matrix_values,
+                                                                attack_type_to_weights)
+    ## re-name the row without any attacks in it...
+    # print "categorical_cm_df.index", categorical_cm_df.index
+    confusion_matrix = categorical_cm_df.rename({(): 'No Attack'}, axis='index')
+
+    classification_performance = sklearn.metrics.classification_report(actual_values, predicted_values, output_dict=True)
+
+    return confusion_matrix, classification_performance
+
+def train_ml_models(time_gran_to_feature_df, time_gran_to_labels):
     time_gran_to_ml_model_name_to_Relevanqt_Model_Info = {}
 
-    for time_gran, feature_and_label_df in time_gran_to_feature_and_label_df.iteritems():
+    for time_gran in time_gran_to_feature_df.key():
+
+        current_feature_df = time_gran_to_feature_df[time_gran]
+        current_labels = time_gran_to_labels[time_gran]
+
         ml_model_name_to_Relevanqt_Model_Info = {}
 
         X, Y, exfil_paths_train, exfil_weights_train = None, None, None, None # TODO
